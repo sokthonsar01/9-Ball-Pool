@@ -4,12 +4,12 @@ export const RAIL = 40;
 export const BALL_RADIUS = 12;
 export const CUE_BALL_MASS = 1;
 export const OBJECT_BALL_MASS = 1;
-export const FRICTION = 0.992;
-export const STOP_SPEED = 0.045;
+export const FRICTION = 0.984;
+export const STOP_SPEED = 0.12;
 export const MAX_POWER = 60;
 export const MIN_POWER = 1;
 export const AIM_LINE_LENGTH = 500;
-export const SHOT_POWER_SCALE = 0.75;
+export const SHOT_POWER_SCALE = 0.6;
 
 // Ball colors and numbers
 export const BALLS = [

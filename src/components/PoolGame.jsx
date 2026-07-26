@@ -69,10 +69,10 @@ function drawBalls(ctx, balls) {
 }
 
 function drawBall3D(ctx, ball, x, y, r) {
-  // Drop shadow
+  // Inner drop shadow only, kept within the ball radius
   ctx.beginPath();
-  ctx.ellipse(x + r * 0.25, y + r * 0.35, r * 0.9, r * 0.7, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.ellipse(x + r * 0.15, y + r * 0.2, r * 0.55, r * 0.45, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
   ctx.fill();
 
   // Main sphere body with radial 3D shading
@@ -96,13 +96,6 @@ function drawBall3D(ctx, ball, x, y, r) {
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.fill();
 
-  // Small rim shadow
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
   // White number circle for striped balls
   if (ball.number === 9 || ball.number === 0) {
     ctx.beginPath();
@@ -119,6 +112,13 @@ function drawBall3D(ctx, ball, x, y, r) {
     ctx.textBaseline = 'middle';
     ctx.fillText(ball.number, x, y + 1);
   }
+
+  // Thin rim, drawn last so it sits exactly on the edge
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
 }
 
 function hexToRgb(hex) {
@@ -143,13 +143,15 @@ function darken(hex, percent) {
   return rgbToHex(r * factor, g * factor, b * factor);
 }
 
-function drawAim(ctx, cueBall, aimAngle, power) {
+function drawAim(ctx, cueBall, aimAngle, power, balls) {
   if (!cueBall || cueBall.pocketed) return;
   const x = cueBall.x * SCALE;
   const y = cueBall.y * SCALE;
   const dirX = Math.cos(aimAngle);
   const dirY = Math.sin(aimAngle);
   const aimLen = AIM_LINE_LENGTH;
+
+  // Cue aim line
   ctx.beginPath();
   ctx.moveTo(x, y);
   ctx.lineTo(x + dirX * aimLen * SCALE, y + dirY * aimLen * SCALE);
@@ -158,12 +160,71 @@ function drawAim(ctx, cueBall, aimAngle, power) {
   ctx.setLineDash([8, 5]);
   ctx.stroke();
   ctx.setLineDash([]);
-  // power indicator circle at cue ball
+
+  // Predict object ball direction on impact
+  const hit = findFirstBallOnRay(cueBall, aimAngle, balls);
+  if (hit) {
+    const hx = hit.ball.x * SCALE;
+    const hy = hit.ball.y * SCALE;
+    // Direction from cue to object ball at impact point
+    const ndx = hit.ball.x - hit.impactX;
+    const ndy = hit.ball.y - hit.impactY;
+    const nlen = Math.hypot(ndx, ndy) || 1;
+    const nx = ndx / nlen;
+    const ny = ndy / nlen;
+    // Predicted object ball travel line
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx + nx * 180 * SCALE, hy + ny * 180 * SCALE);
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Small dot at predicted impact point
+    ctx.beginPath();
+    ctx.arc(hit.impactX * SCALE, hit.impactY * SCALE, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#facc15';
+    ctx.fill();
+  }
+
+  // Power indicator circle at cue ball
   ctx.beginPath();
   ctx.arc(x, y, 6 + (power / MAX_POWER) * 16, 0, Math.PI * 2);
   ctx.strokeStyle = `hsl(${(1 - power / MAX_POWER) * 120}, 90%, 50%)`;
   ctx.lineWidth = 3;
   ctx.stroke();
+}
+
+function findFirstBallOnRay(cueBall, angle, balls) {
+  let nearest = null;
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
+  for (const b of balls) {
+    if (b.pocketed || b.number === 0) continue;
+    const dx = b.x - cueBall.x;
+    const dy = b.y - cueBall.y;
+    const projection = dx * dirX + dy * dirY;
+    if (projection <= 0) continue;
+    const perpX = dx - projection * dirX;
+    const perpY = dy - projection * dirY;
+    const perpDist = Math.hypot(perpX, perpY);
+    if (perpDist <= BALL_RADIUS * 2) {
+      // Impact point is along the ray, offset by one radius from cue center
+      const impactDist = projection - Math.sqrt((BALL_RADIUS * 2) ** 2 - perpDist ** 2);
+      if (impactDist > 0) {
+        if (!nearest || impactDist < nearest.dist) {
+          nearest = {
+            ball: b,
+            dist: impactDist,
+            impactX: cueBall.x + dirX * impactDist,
+            impactY: cueBall.y + dirY * impactDist,
+          };
+        }
+      }
+    }
+  }
+  return nearest;
 }
 
 function angleBetween(a, b) {
@@ -214,7 +275,7 @@ export default function PoolGame() {
     drawBalls(ctx, ballsRef.current);
     const cue = getCueBall(ballsRef.current);
     if (!isShooting && cue && !cue.pocketed && allBallsStopped(ballsRef.current)) {
-      drawAim(ctx, cue, aimAngle, power);
+      drawAim(ctx, cue, aimAngle, power, ballsRef.current);
     }
   }, [aimAngle, power, isShooting]);
 
@@ -266,23 +327,20 @@ export default function PoolGame() {
     const currentBalls = ballsRef.current;
     moveBalls(currentBalls);
     resolveCushionCollisions(currentBalls, TABLE_WIDTH, TABLE_HEIGHT, RAIL);
-    // Track first object ball hit by cue ball for rules
+
+    // Track first object ball hit by cue ball for rules via collision callback
     const cue = getCueBall(currentBalls);
-    if (cue && !cue.pocketed) {
-      for (const b of currentBalls) {
-        if (b.number === 0 || b.pocketed) continue;
-        const dx = b.x - cue.x;
-        const dy = b.y - cue.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < BALL_RADIUS * 2 && !firstHitRef.current) {
-          const separating = (b.vx - cue.vx) * dx + (b.vy - cue.vy) * dy > 0;
-          if (!separating) {
-            firstHitRef.current = b;
-          }
+    const handleCollision = (a, b) => {
+      if (!firstHitRef.current) {
+        if (a.number === 0 && b.number > 0) {
+          firstHitRef.current = b;
+        } else if (b.number === 0 && a.number > 0) {
+          firstHitRef.current = a;
         }
       }
-    }
-    resolveBallCollisions(currentBalls);
+    };
+
+    resolveBallCollisions(currentBalls, handleCollision);
     const pocketed = checkPockets(currentBalls);
     if (pocketed.length > 0) {
       for (const p of pocketed) {

@@ -17,14 +17,20 @@ export function rackBalls() {
   const balls = [];
   const startX = 850;
   const startY = 300;
-  const gap = BALL_RADIUS * 2 + 1;
-  // 9-ball rack: triangle with 3 rows
-  const rows = 3;
+  const diameter = BALL_RADIUS * 2;
+  const gap = 1; // tiny gap so they settle without overlap
+  const spacing = diameter + gap;
+  // Triangle rack rows: 1, 2, 3 (total 6 balls for 1-9 is wrong; should be 1+2+3+4=10)
+  // 9-ball rack is 1+2+3 = 6 balls, but we need 9 balls. Actual 9-ball rack is diamond shape:
+  // row0: 1 ball, row1: 2 balls, row2: 3 balls, row3: 2 balls, row4: 1 ball = 9 balls
+  const rowCounts = [1, 2, 3, 2, 1];
   let idx = 1;
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col <= row; col++) {
-      const x = startX + row * gap * 0.866;
-      const y = startY + (col - row / 2) * gap;
+  for (let row = 0; row < rowCounts.length; row++) {
+    const count = rowCounts[row];
+    const x = startX + row * spacing * Math.sqrt(3) / 2;
+    const rowStartY = startY - ((count - 1) * spacing) / 2;
+    for (let col = 0; col < count; col++) {
+      const y = rowStartY + col * spacing;
       const colors = [
         '#f4d03f', // 1 yellow
         '#2e86de', // 2 blue
@@ -49,8 +55,8 @@ export function moveBalls(balls) {
   for (const ball of balls) {
     if (ball.pocketed) continue;
     const speed = Math.hypot(ball.vx, ball.vy);
-    // Apply sliding friction when moving, rolling friction when slow
-    const friction = speed > 1.5 ? FRICTION : 0.995;
+    // Higher friction so balls don't roll forever after impact
+    const friction = speed > 1.2 ? FRICTION : 0.985;
     ball.x += ball.vx;
     ball.y += ball.vy;
     ball.vx *= friction;
@@ -67,24 +73,24 @@ export function resolveCushionCollisions(balls, width, height, rail) {
     if (ball.pocketed) continue;
     if (ball.x - BALL_RADIUS < rail) {
       ball.x = rail + BALL_RADIUS;
-      ball.vx = -ball.vx * 0.78;
+      ball.vx = -ball.vx * 0.65;
     }
     if (ball.x + BALL_RADIUS > width - rail) {
       ball.x = width - rail - BALL_RADIUS;
-      ball.vx = -ball.vx * 0.78;
+      ball.vx = -ball.vx * 0.65;
     }
     if (ball.y - BALL_RADIUS < rail) {
       ball.y = rail + BALL_RADIUS;
-      ball.vy = -ball.vy * 0.78;
+      ball.vy = -ball.vy * 0.65;
     }
     if (ball.y + BALL_RADIUS > height - rail) {
       ball.y = height - rail - BALL_RADIUS;
-      ball.vy = -ball.vy * 0.78;
+      ball.vy = -ball.vy * 0.65;
     }
   }
 }
 
-export function resolveBallCollisions(balls) {
+export function resolveBallCollisions(balls, onCollision) {
   for (let i = 0; i < balls.length; i++) {
     for (let j = i + 1; j < balls.length; j++) {
       const a = balls[i];
@@ -104,13 +110,15 @@ export function resolveBallCollisions(balls) {
         const dvx = b.vx - a.vx;
         const dvy = b.vy - a.vy;
         const velocityAlongNormal = dvx * nx + dvy * ny;
-        if (velocityAlongNormal > 0) continue;
-        const restitution = 0.92;
-        const impulse = -(1 + restitution) * velocityAlongNormal / 2;
-        a.vx -= impulse * nx;
-        a.vy -= impulse * ny;
-        b.vx += impulse * nx;
-        b.vy += impulse * ny;
+        if (velocityAlongNormal < 0) {
+          if (onCollision) onCollision(a, b);
+          const restitution = 0.88;
+          const impulse = -(1 + restitution) * velocityAlongNormal / 2;
+          a.vx -= impulse * nx;
+          a.vy -= impulse * ny;
+          b.vx += impulse * nx;
+          b.vy += impulse * ny;
+        }
       }
     }
   }
