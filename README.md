@@ -1,16 +1,31 @@
-# React + Vite
+# 9-Ball Pool
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A two-player 9-ball pool game built with React, Vite, and the HTML canvas.
 
-Currently, two official plugins are available:
+## How to play
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Aim** by moving the mouse — the assist shows the cue path, the ghost ball at contact, the object ball's predicted path, and the cue ball's deflection.
+- **Shoot** by click-dragging backwards from your aim line and releasing (drag distance = power), or set the power slider and press **Space** / click **Shoot**. Scroll the mouse wheel to fine-tune power.
+- **Spin**: click the spin pad to add english (sides), follow (top), or draw (bottom).
 
-## React Compiler
+## Rules (real 9-ball)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Players alternate turns; the lowest-numbered ball must always be struck first.
+- Pocket any ball off a legal hit and you keep shooting.
+- Fouls (scratch, wrong ball first, no contact, no rail after contact) give the opponent **ball in hand** — place the cue ball anywhere.
+- Pocket the **9-ball** on a legal shot to win the rack. Pocketing the 9 on a foul respots it.
+- Rack wins are tracked on the scoreboard; the winner breaks the next rack.
 
-## Expanding the Oxlint configuration
+## Tech
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- Substepped 2D physics (no tunneling at high speed), cushion restitution, pocket capture with sink animation, spin-influenced collisions and rebounds.
+- Rendering: cached table layer + per-frame ball/aim drawing at devicePixelRatio, driven by `requestAnimationFrame`; React only re-renders the HUD.
+- Synthesized sound effects via the Web Audio API (no audio assets).
+
+## Scripts
+
+```sh
+npm run dev      # start the dev server
+npm run build    # production build
+npm run lint     # oxlint
+```

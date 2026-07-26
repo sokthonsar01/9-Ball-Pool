@@ -1,63 +1,35 @@
-import { BALLS } from '../constants';
+// 9-ball rules: always strike the lowest-numbered ball first. Any ball may be
+// pocketed off a legal hit. Fouls give the opponent ball in hand. Pocketing
+// the 9 on a legal shot wins the rack; on a foul it is respotted.
 
-export function nineBallHitOrder() {
-  return [1, 2, 3, 4, 5, 6, 7, 8, 9];
-}
-
-export function currentTarget(nextTargetIndex) {
-  const order = nineBallHitOrder();
-  return order[nextTargetIndex] || 9;
-}
-
-export function findCueBall(balls) {
-  return balls.find(b => b.number === 0);
-}
-
-export function findFirstHit(balls, pocketedThisShot, cueBall) {
-  // We can't detect first hit exactly from state, so pass it from collision event.
-  return null;
-}
-
-export function isLegalShot(cueBall, firstObjectHit, targetNumber, pocketedThisShot) {
-  if (!firstObjectHit) {
-    // Cue ball did not hit any object ball → foul
-    return { legal: false, foul: 'No object ball hit' };
+export function lowestRemaining(balls) {
+  let lowest = null;
+  for (const b of balls) {
+    if (b.number === 0 || b.pocketed || b.sinking) continue;
+    if (!lowest || b.number < lowest.number) lowest = b;
   }
-  if (firstObjectHit.number !== targetNumber) {
-    return { legal: false, foul: `Wrong ball first. Target was ${targetNumber}, hit ${firstObjectHit.number}` };
+  return lowest ? lowest.number : 9;
+}
+
+export function evaluateShot({ cueScratched, firstHit, targetNumber, pocketed, railAfterContact }) {
+  if (!firstHit) {
+    return { legal: false, foul: 'the cue ball never touched another ball' };
   }
-  // Legal hit. It doesn't have to pocket a ball.
+  if (firstHit.number !== targetNumber) {
+    return {
+      legal: false,
+      foul: `wrong ball first — the ${targetNumber}-ball must be struck first, but the ${firstHit.number}-ball was hit`,
+    };
+  }
+  if (cueScratched) {
+    return { legal: false, foul: 'scratch — the cue ball was pocketed' };
+  }
+  if (pocketed.length === 0 && !railAfterContact) {
+    return { legal: false, foul: 'no ball was pocketed and none reached a cushion after contact' };
+  }
   return { legal: true, foul: null };
 }
 
-export function checkScratch(cueBall) {
-  return cueBall.pocketed;
-}
-
-export function isGameWon(balls) {
-  const nine = balls.find(b => b.number === 9);
-  return nine?.pocketed;
-}
-
-export function nextTargetAfterPocket(targetIndex, pocketedBalls) {
-  const order = nineBallHitOrder();
-  let newIndex = targetIndex;
-  while (newIndex < order.length) {
-    const num = order[newIndex];
-    if (pocketedBalls.some(b => b.number === num)) {
-      newIndex++;
-    } else {
-      break;
-    }
-  }
-  return newIndex;
-}
-
 export function formatBall(number) {
-  if (number === 0) return 'Cue';
-  return `${number}-ball`;
-}
-
-export function isRackResetNeeded(balls) {
-  return balls.some(b => b.pocketed) === false;
+  return number === 0 ? 'cue ball' : `${number}-ball`;
 }
